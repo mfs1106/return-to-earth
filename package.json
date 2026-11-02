@@ -1,0 +1,19 @@
+{
+  "name": "return-to-earth",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "RETURN TO EARTH - interactive SpaceX Falcon 9 recovery and Starship visualisation",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "build:standalone": "npm run build && node scripts/build-standalone.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "vite": "6.3.5"
+  }
+}

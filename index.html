@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#02070b" />
+    <meta
+      name="description"
+      content="RETURN TO EARTH — 可交互的 SpaceX Falcon 9 一级回收、Starship 热分离/塔臂捕获可视化，以及 Starbase 全设施静态结构拆解。官方事件锚点与明确标注的模拟估算。"
+    />
+    <title>RETURN TO EARTH · Falcon 9 / Starship / Starbase 结构拆解</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="RETURN TO EARTH 首页">
+          <span class="brand-mark">R<span>/</span>E</span>
+          <span class="brand-copy">
+            <strong>RETURN TO EARTH</strong>
+            <small>REUSABLE LAUNCH SIMULATION</small>
+          </span>
+        </a>
+
+        <nav class="vehicle-tabs" role="tablist" aria-label="选择飞行器">
+          <button class="vehicle-tab is-active" data-vehicle="falcon" role="tab" aria-selected="true">
+            <span>FALCON 9</span>
+            <small>一级回收</small>
+          </button>
+          <button class="vehicle-tab" data-vehicle="starship" role="tab" aria-selected="false">
+            <span>STARSHIP</span>
+            <small>热分离 · 塔臂捕获</small>
+          </button>
+        </nav>
+
+        <button class="starbase-entry" id="starbaseEntryBtn" type="button" aria-haspopup="dialog" aria-controls="starbaseExplorer" title="打开 Starbase 全设施结构拆解">
+          <span class="starbase-entry-mark" aria-hidden="true">⌂</span>
+          <span class="starbase-entry-copy">
+            <small>EXPLORE STARBASE</small>
+            <strong>全设施拆解</strong>
+          </span>
+          <span class="starbase-entry-arrow" aria-hidden="true">↗</span>
+        </button>
+
+        <div class="top-actions">
+          <label class="select-wrap" id="missionSelectWrap">
+            <span>任务</span>
+            <select id="missionSelect" aria-label="选择 Falcon 9 参考任务">
+              <option value="crew12">Crew-12 · 陆地</option>
+              <option value="starlink1038">Starlink 10-38 · 海上</option>
+            </select>
+          </label>
+          <label class="select-wrap">
+            <span>画质</span>
+            <select id="qualitySelect" aria-label="选择画质">
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <button class="icon-btn sound-btn" id="soundBtn" aria-pressed="false" title="声音默认关闭">
+            <span class="sound-icon" aria-hidden="true">◌</span><span id="soundLabel">声音关</span>
+          </button>
+          <button class="icon-btn" id="helpBtn" aria-haspopup="dialog">操作说明</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="viewport" id="viewport">
+          <canvas id="scene" aria-label="可交互三维航天场景" role="img"></canvas>
+          <div class="viewport-shade" aria-hidden="true"></div>
+
+          <div class="viewport-top">
+            <div class="phase-card">
+              <div class="eyebrow">
+                <i class="live-dot" aria-hidden="true"></i>
+                <span id="phaseKicker">FALCON 9 · CREW-12</span>
+              </div>
+              <h1 id="phaseTitle">发射台待命</h1>
+              <p id="phaseHint">倒计时、加注与终端状态。画面中除官方事件时间外，姿态、参数与镜头均为模拟。</p>
+              <div class="phase-tags">
+                <span class="tag official">官方事件时间</span>
+                <span class="tag simulated">模拟 / 估算</span>
+              </div>
+            </div>
+            <div class="clock-badge" aria-label="任务经过时间">
+              <span>MET</span>
+              <strong id="clockBadge">T−00:10</strong>
+              <small id="clockBadgeSub">SIMULATED CLOCK</small>
+            </div>
+          </div>
+
+          <div class="camera-dock" id="cameraDock" role="group" aria-label="镜头选择"></div>
+          <div class="part-labels" id="partLabels" aria-label="可点选部件"></div>
+          <div class="event-toast" id="eventToast" role="status" aria-live="polite"></div>
+          <div class="drag-hint" id="dragHint">拖拽旋转 · 滚轮 / 双指缩放 · 双击复位</div>
+
+          <div class="inspect-bar" id="inspectBar" hidden>
+            <div>
+              <span class="tag teaching">教学拆解</span>
+              <strong id="inspectTitle">整箭 / 剖面 / 爆炸拆解</strong>
+              <small>拆解视图用于认识部件，不代表 Falcon 9 在真实任务中会分离这些部件。</small>
+            </div>
+            <button class="btn ghost" id="restoreBtn">一键复原</button>
+          </div>
+
+          <aside class="part-info" id="partInfo" hidden aria-live="polite">
+            <button class="panel-close" id="partInfoClose" aria-label="关闭部件信息">×</button>
+            <span class="eyebrow" id="partCategory">组件</span>
+            <h2 id="partName">部件</h2>
+            <p id="partFunction"></p>
+            <small id="partReality"></small>
+          </aside>
+
+          <aside class="challenge-panel" id="challengePanel" hidden>
+            <header>
+              <div>
+                <span class="eyebrow">TEACHING MODEL</span>
+                <h2>手动挑战</h2>
+              </div>
+              <button class="panel-close" id="challengeClose" aria-label="关闭挑战面板">×</button>
+            </header>
+            <p class="challenge-lead">
+              调整少量返航与着陆参数，观察不同结果。这是教学模型，不是 SpaceX 制导、导航与控制算法。
+            </p>
+            <div class="challenge-field" id="boostbackField">
+              <label for="chBoostback">返航点火强度 <output id="chBoostbackOut">100%</output></label>
+              <input id="chBoostback" type="range" min="80" max="120" value="100" step="1" />
+              <small>仅陆地模式可用；海上任务官方时间线未列返航点火。</small>
+            </div>
+            <div class="challenge-field">
+              <label for="chLandingAlt">着陆点火高度 <output id="chLandingAltOut">3,800 m</output></label>
+              <input id="chLandingAlt" type="range" min="1200" max="5200" value="3800" step="50" />
+            </div>
+            <div class="challenge-field">
+              <label for="chLateral">着陆横向偏移 <output id="chLateralOut">0 m</output></label>
+              <input id="chLateral" type="range" min="-80" max="80" value="0" step="2" />
+            </div>
+            <div class="challenge-field">
+              <label for="chAoa">再入迎角 <output id="chAoaOut">6°</output></label>
+              <input id="chAoa" type="range" min="2" max="14" value="6" step="1" />
+            </div>
+            <div class="challenge-preview" id="challengePreview">
+              <span>预估结果</span>
+              <strong>成功回收</strong>
+              <small>触地速度 1.8 m/s · 落点偏差 0 m</small>
+            </div>
+            <div class="challenge-actions">
+              <button class="btn ghost" id="challengeReset">恢复默认</button>
+              <button class="btn ghost" id="challengeJump">跳到着陆前</button>
+              <button class="btn primary" id="challengeReplay">应用并重播</button>
+            </div>
+            <small class="challenge-note">
+              结果由简化的触地速度与横向偏差模型给出；轨迹关键帧不会因参数而重写，仅演示回收结果差异。
+            </small>
+          </aside>
+
+          <div class="intro-overlay" id="introOverlay">
+            <div class="intro-card">
+              <div class="intro-kicker">
+                <span class="pulse-line" aria-hidden="true"></span>
+                <span id="introKicker">MISSION SIMULATION / FALCON 9</span>
+              </div>
+              <h2>RETURN<br /><span>TO EARTH</span></h2>
+              <p id="introLead">
+                两级火箭，一台返航的一级。用官方任务时间轴作为锚点，重建 Falcon 9 从发射到垂直回收的完整流程。
+              </p>
+              <div class="intro-mission">
+                <span class="tag official">官方事件锚点</span>
+                <strong id="introMission">CREW-12 · 陆地回收</strong>
+                <small id="introSource">SpaceX Crew-12 任务页</small>
+              </div>
+              <div class="intro-actions">
+                <button class="btn primary large" id="startBtn">
+                  <span class="play-glyph" aria-hidden="true">▶</span> 开始自动演示
+                </button>
+                <button class="btn ghost large" id="exploreBtn">探索火箭部件</button>
+              </div>
+              <div class="intro-footer">
+                <span>拖拽旋转 · 滚轮缩放</span>
+                <span>所有飞行数值默认标注为“模拟估算”</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="summary-overlay" id="summaryOverlay" hidden>
+            <div class="summary-card">
+              <div class="summary-orb" aria-hidden="true"></div>
+              <span class="eyebrow" id="summaryKicker">MISSION COMPLETE · FALCON 9</span>
+              <h2 id="summaryTitle">一级回收完成</h2>
+              <p id="summaryLead"></p>
+              <div class="summary-stats" id="summaryStats"></div>
+              <div class="summary-actions">
+                <button class="btn primary" id="summaryReplay">重播任务</button>
+                <button class="btn ghost" id="summaryChallenge">手动挑战</button>
+                <button class="btn ghost" id="summaryClose">返回画面</button>
+              </div>
+              <small class="summary-disclaimer">
+                官方事件时间来自任务页；“高度、速度、燃料、落点”等为简化模拟，不是 SpaceX 遥测。
+              </small>
+            </div>
+          </div>
+
+          <div class="loading-screen" id="loading">
+            <div class="loader">
+              <span class="loader-ring" aria-hidden="true"></span>
+              <span>INITIALISING FLIGHT MODEL</span>
+              <small>加载程序化几何与环境</small>
+            </div>
+          </div>
+
+          <div class="webgl-fallback" id="webglFallback" hidden>
+            <div>
+              <span class="eyebrow">WEBGL UNAVAILABLE</span>
+              <h2>无法启动三维场景</h2>
+              <p>
+                当前浏览器或显卡未提供可用的 WebGL 2 上下文。请更新浏览器、启用硬件加速，或换用桌面版 Chrome / Edge / Firefox。
+                页面中的任务时间轴与文字说明仍可在支持 WebGL 的设备上查看。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="telemetry" aria-label="遥测面板">
+          <div class="panel-head">
+            <h2>TELEMETRY <span>/ 遥测</span></h2>
+            <span class="sim-chip">模拟估算</span>
+          </div>
+          <div class="clock-block">
+            <span class="mini-label">任务时间 / MET</span>
+            <div class="mission-clock" id="missionClock">T−00:10</div>
+            <div class="mission-meta">
+              <span id="missionName">CREW-12</span>
+              <span class="dot-sep">·</span>
+              <span id="missionType">陆地回收</span>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric">
+              <span class="mini-label" id="altLabel">高度 · 一级</span>
+              <div class="metric-value"><strong id="altValue">0</strong><em id="altUnit">m</em></div>
+              <small>模拟估算</small>
+            </div>
+            <div class="metric">
+              <span class="mini-label" id="speedLabel">速度 · 一级</span>
+              <div class="metric-value"><strong id="speedValue">0</strong><em>m/s</em></div>
+              <small>模拟估算</small>
+            </div>
+            <div class="metric">
+              <span class="mini-label">垂直速度</span>
+              <div class="metric-value"><strong id="vSpeedValue">0</strong><em>m/s</em></div>
+              <small id="vSpeedDirection">相对地面</small>
+            </div>
+            <div class="metric">
+              <span class="mini-label" id="missLabel">模拟落点偏差</span>
+              <div class="metric-value"><strong id="missValue">—</strong><em id="missUnit"></em></div>
+              <small id="missSubLabel">距目标区</small>
+            </div>
+          </div>
+
+          <div class="section-row">
+            <h3>STAGE VEHICLES</h3>
+            <span>分离后独立计算</span>
+          </div>
+          <div class="stage-grid">
+            <article class="stage-card" id="stageCard1">
+              <header>
+                <span class="stage-id">S1</span>
+                <span class="stage-state" id="s1State">随整箭</span>
+              </header>
+              <strong><span id="s1Alt">0</span> <small id="s1Unit">m</small></strong>
+              <div class="stage-sub"><span><span id="s1Speed">0</span> m/s</span><span id="s1Role">一级</span></div>
+            </article>
+            <article class="stage-card" id="stageCard2">
+              <header>
+                <span class="stage-id warm">S2</span>
+                <span class="stage-state" id="s2State">随整箭</span>
+              </header>
+              <strong><span id="s2Alt">0</span> <small id="s2Unit">m</small></strong>
+              <div class="stage-sub"><span><span id="s2Speed">0</span> m/s</span><span id="s2Role">二级</span></div>
+            </article>
+          </div>
+
+          <div class="fuel-block">
+            <div class="bar-row">
+              <span>一级推进剂</span><span id="s1FuelLabel">100%</span>
+              <div class="fuel-track"><i id="s1FuelBar" style="width: 100%"></i></div>
+            </div>
+            <div class="bar-row">
+              <span>二级推进剂</span><span id="s2FuelLabel">100%</span>
+              <div class="fuel-track warm"><i id="s2FuelBar" style="width: 100%"></i></div>
+            </div>
+          </div>
+
+          <div class="engine-section">
+            <div class="section-row tight">
+              <h3>ENGINES / 发动机</h3>
+              <span id="engineSummary">9 / 9</span>
+            </div>
+            <div class="engine-dots" id="engineDots" aria-label="一级发动机工作状态"></div>
+            <div class="engine-caption">
+              <span id="engineMode">待命</span>
+              <span id="engineThrottle">节流 —</span>
+            </div>
+          </div>
+
+          <div class="target-card">
+            <div>
+              <span class="mini-label">目标区</span>
+              <strong id="targetLabel">LZ-1 陆地着陆区</strong>
+            </div>
+            <span class="target-status" id="targetStatus">等待分离</span>
+          </div>
+
+          <div class="note-card" id="missionNote">
+            <span class="mini-label">任务备注</span>
+            <p id="missionNoteText">官方事件时间来自任务页；其余参数为简化模拟。</p>
+          </div>
+
+          <div class="sources" id="sourceLinks">
+            <span class="mini-label">官方来源</span>
+            <a href="https://www.spacex.com/launches/crew12" target="_blank" rel="noopener">SpaceX · Crew-12 ↗</a>
+            <a href="https://new.spacex.com/vehicles/falcon-9" target="_blank" rel="noopener">SpaceX · Falcon 9 ↗</a>
+          </div>
+        </aside>
+      </main>
+
+      <section class="console" aria-label="任务时间轴与控制">
+        <div class="console-head">
+          <div class="phase-summary">
+            <span class="phase-index" id="phaseIndex">00</span>
+            <div>
+              <strong id="phaseLabel">发射台待命</strong>
+              <span id="nextEventLabel">下一事件：点火 · 起飞</span>
+            </div>
+          </div>
+          <div class="timeline-legend">
+            <span><i class="legend-dot official"></i>官方事件</span>
+            <span><i class="legend-dot simulated"></i>模拟 / 估算</span>
+            <span class="keyboard-hint">空格 播放/暂停 · ←/→ 跳转</span>
+          </div>
+          <div class="official-source-inline" id="officialSourceInline">
+            <span class="mini-label">OFFICIAL ANCHOR</span>
+            <a href="https://www.spacex.com/launches/crew12" target="_blank" rel="noopener">SpaceX Crew-12 ↗</a>
+          </div>
+        </div>
+
+        <div class="timeline" id="timeline">
+          <div class="timeline-labels" id="timelineMarkers" aria-label="任务事件标记"></div>
+          <div class="timeline-rail">
+            <div class="timeline-progress" id="timelineProgress"></div>
+            <input
+              id="timeSlider"
+              type="range"
+              min="-10"
+              max="497"
+              step="0.1"
+              value="-10"
+              aria-label="拖动任务时间"
+            />
+          </div>
+        </div>
+
+        <div class="transport">
+          <div class="transport-main">
+            <button class="round-btn" id="restartBtn" title="重播 (R)" aria-label="重播">↺</button>
+            <button class="primary-play" id="playBtn" aria-label="播放">
+              <span id="playIcon">▶</span>
+            </button>
+            <div class="speed-group" role="group" aria-label="播放速度">
+              <button data-speed="0.5">0.5×</button>
+              <button data-speed="2" class="is-active">2×</button>
+              <button data-speed="4">4×</button>
+            </div>
+            <span class="time-readout" id="timeReadout">T−00:10 / T+08:17</span>
+          </div>
+
+          <div class="view-modes" id="viewModes" role="group" aria-label="火箭视图">
+            <button data-view="stack" class="is-active">整箭</button>
+            <button data-view="cutaway">剖面</button>
+            <button data-view="exploded">爆炸拆解</button>
+          </div>
+
+          <div class="console-actions">
+            <div class="mode-toggle" id="modeToggle" role="group" aria-label="演示模式">
+              <button id="autoModeBtn" class="is-active">自动演示</button>
+              <button id="challengeModeBtn">手动挑战</button>
+            </div>
+            <button class="btn ghost small" id="hlsBtn" hidden>HLS 月球架构</button>
+            <button class="btn ghost small" id="summaryBtn">任务总结</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="starbase-explorer" id="starbaseExplorer" hidden role="dialog" aria-modal="true" aria-labelledby="sbTitle">
+      <header class="sb-header">
+        <div class="sb-brand">
+          <span class="sb-brand-mark" aria-hidden="true">S/</span>
+          <div>
+            <span class="sb-eyebrow">STARBASE · STRUCTURE EXPLORER</span>
+            <h1 id="sbTitle">全设施拆解</h1>
+          </div>
+        </div>
+
+        <div class="sb-pose-switch" role="group" aria-label="选择静态姿态">
+          <span class="sb-control-label">静态姿态</span>
+          <button type="button" data-sb-pose="stack" class="is-active">整箭 · 发射平台</button>
+          <button type="button" data-sb-pose="catch">Super Heavy · 机械臂捕获位</button>
+        </div>
+
+        <div class="sb-header-actions">
+          <label class="sb-select-label">
+            <span>画质</span>
+            <select id="sbQuality" aria-label="结构探索器画质">
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <button type="button" class="sb-icon-btn sb-mobile-only" id="sbTreeToggle" aria-controls="sbTreePanel" aria-expanded="true">结构树</button>
+          <button type="button" class="sb-icon-btn sb-mobile-only" id="sbDetailToggle" aria-controls="sbDetail">说明</button>
+          <button type="button" class="sb-close-btn" id="starbaseClose">
+            <span aria-hidden="true">←</span> 返回飞行演示
+          </button>
+        </div>
+      </header>
+
+      <div class="sb-workbench">
+        <aside class="sb-tree-panel" id="sbTreePanel" aria-label="设施结构树">
+          <div class="sb-panel-head">
+            <div>
+              <span class="sb-eyebrow">ASSEMBLY TREE</span>
+              <h2>结构层级</h2>
+            </div>
+            <span class="sb-count" id="sbPartCount">—</span>
+          </div>
+          <div class="sb-search-row">
+            <span class="sb-search-icon" aria-hidden="true">⌕</span>
+            <input id="sbSearch" type="search" autocomplete="off" placeholder="搜索：塔臂 / 发动机 / 栅格翼…" aria-label="搜索设施部件" />
+            <button type="button" id="sbSearchClear" class="sb-search-clear" aria-label="清除搜索" hidden>×</button>
+          </div>
+          <div class="sb-search-meta">
+            <span id="sbSearchCount">全部可探索部件</span>
+            <button type="button" id="sbExpandAll" class="sb-text-btn">展开全部</button>
+          </div>
+          <div class="sb-tree" id="sbTree" role="tree" aria-label="Starbase 部件树"></div>
+          <div class="sb-tree-foot">
+            <span class="sb-version">参考构型：2025–2026 公开资料中的 Starship / Super Heavy 概念构型 · 教学重建</span>
+            <p>尺寸、内部机构、管路与传动均为教学示意或比例估算，不是 SpaceX 工程图。</p>
+            <div class="sb-source-links">
+              <a href="https://www.spacex.com/vehicles/starship/design" target="_blank" rel="noopener">SpaceX · Starship design ↗</a>
+              <a href="https://www.spacex.com/vehicles/starship/assets/media/Starbase%20Overview.pdf" target="_blank" rel="noopener">SpaceX · Starbase Overview PDF ↗</a>
+            </div>
+          </div>
+        </aside>
+
+        <main class="sb-stage" id="sbStage">
+          <canvas id="starbaseCanvas" aria-label="可交互的 Starbase 全设施三维结构模型" role="img"></canvas>
+          <div class="sb-stage-shade" aria-hidden="true"></div>
+
+          <div class="sb-stage-top">
+            <div class="sb-compare" role="group" aria-label="显示模式">
+              <button type="button" data-sb-compare="assembled" class="is-active">整装</button>
+              <button type="button" data-sb-compare="exploded">拆解</button>
+              <button type="button" data-sb-compare="section">剖面</button>
+              <button type="button" id="sbXrayBtn">X-Ray</button>
+            </div>
+            <div class="sb-top-tools">
+              <label class="sb-select-label compact">
+                <span>剖面 / X-Ray</span>
+                <select id="sbSectionScope">
+                  <option value="all">全部</option>
+                  <option value="booster">Super Heavy</option>
+                  <option value="ship">Starship</option>
+                  <option value="tower">发射塔</option>
+                  <option value="platform">发射平台</option>
+                </select>
+              </label>
+              <button type="button" id="sbHomeView" class="sb-icon-btn" title="复位视角 (0)">复位视角</button>
+              <button type="button" id="sbFit" class="sb-icon-btn" title="适应全部">适应视图</button>
+            </div>
+          </div>
+
+          <div class="sb-hover-tip" id="sbHoverTip" hidden></div>
+
+          <div class="sb-tour-bar" role="group" aria-label="结构导览">
+            <span class="sb-tour-kicker">FOCUS</span>
+            <button type="button" data-sb-tour="overview">整套设施</button>
+            <button type="button" data-sb-tour="arms">塔臂接触</button>
+            <button type="button" data-sb-tour="mount">发射支座</button>
+            <button type="button" data-sb-tour="engines">助推器发动机舱</button>
+            <button type="button" data-sb-tour="shield">热防护与襟翼</button>
+          </div>
+
+          <div class="sb-manip-banner" id="sbManipBanner" hidden>
+            <span><strong>单件拖拽</strong> 正在移动所选部件 · 鼠标拖拽，Esc 退出</span>
+            <button type="button" id="sbManipExit">结束拖拽</button>
+          </div>
+
+          <div class="sb-loading" id="sbLoading" aria-live="polite">
+            <span class="sb-loader" aria-hidden="true"></span>
+            <strong>正在建立 Starbase 结构模型</strong>
+            <small>程序化装配 · 部件索引 · 连接关系</small>
+          </div>
+          <div class="sb-load-error" id="sbLoadError" hidden role="alert">
+            <strong>结构场景加载失败</strong>
+            <p id="sbLoadErrorText">请刷新页面重试。原有 Falcon 9 / Starship 飞行演示不受影响。</p>
+            <button type="button" id="sbRetryBtn" class="sb-primary-btn">重试</button>
+          </div>
+
+          <div class="sb-canvas-note" id="sbCanvasNote">左键旋转 · 滚轮缩放 · 右键平移 · 点击部件查看说明</div>
+        </main>
+
+        <aside class="sb-detail-panel" id="sbDetail" hidden aria-label="部件详情">
+          <button type="button" class="sb-detail-close" id="sbDetailClose" aria-label="关闭部件详情">×</button>
+          <div class="sb-detail-cat"><span id="sbDetailCategory">总成</span><span id="sbDetailKind">装配</span></div>
+          <h2 id="sbDetailName">选择一个部件</h2>
+          <code id="sbDetailId" class="sb-part-id">—</code>
+          <div class="sb-facts" id="sbDetailFacts"></div>
+          <p class="sb-detail-desc" id="sbDetailDescription"></p>
+          <div class="sb-detail-note">
+            <span>资料边界</span>
+            <p id="sbDetailSource">尺寸与内部机构为教学示意，不代表 SpaceX 官方工程结构。</p>
+          </div>
+          <div class="sb-detail-meta">
+            <span>子部件 <strong id="sbDetailChildren">0</strong></span>
+            <span>所属 <strong id="sbDetailAssembly">—</strong></span>
+          </div>
+          <div class="sb-detail-actions">
+            <button type="button" id="sbFocusBtn">聚焦</button>
+            <button type="button" id="sbExtractBtn">拆出</button>
+            <button type="button" id="sbResetPartBtn">归位</button>
+            <button type="button" id="sbHideBtn">隐藏</button>
+            <button type="button" id="sbGhostBtn">半透明</button>
+            <button type="button" id="sbRotateYBtn" title="绕本机 Y 轴旋转 45°">旋转 Y</button>
+            <button type="button" id="sbRotateXBtn" title="绕本机 X 轴旋转 45°">旋转 X</button>
+            <button type="button" id="sbManipBtn">单件拖拽</button>
+          </div>
+          <label class="sb-part-slider">
+            <span>单件偏移 <output id="sbPartOffsetValue">0</output></span>
+            <input id="sbPartOffset" type="range" min="0" max="60" step="1" value="0" />
+          </label>
+          <label class="sb-check-row">
+            <input type="checkbox" id="sbAutoFade" checked />
+            <span>选中时自动淡化相邻部件</span>
+          </label>
+        </aside>
+      </div>
+
+      <footer class="sb-footer">
+        <div class="sb-depth">
+          <div class="sb-depth-head">
+            <span class="sb-control-label">拆解深度</span>
+            <strong id="sbProgressValue">整装 · 0%</strong>
+          </div>
+          <input id="sbProgress" type="range" min="0" max="100" step="0.5" value="0" aria-label="整体拆解深度" />
+          <div class="sb-depth-presets" role="group" aria-label="拆解深度预设">
+            <button type="button" data-sb-progress="0" class="is-active">整装</button>
+            <button type="button" data-sb-progress="33">一级拆解</button>
+            <button type="button" data-sb-progress="66">二级拆解</button>
+            <button type="button" data-sb-progress="100">细部拆解</button>
+          </div>
+        </div>
+        <div class="sb-scope">
+          <span class="sb-control-label">拆解范围</span>
+          <div class="sb-scope-chips" role="group" aria-label="拆解范围">
+            <button type="button" data-sb-scope="all" class="is-active">全部</button>
+            <button type="button" data-sb-scope="facility/tower">只拆塔架</button>
+            <button type="button" data-sb-scope="facility/launch-mount">只拆平台</button>
+            <button type="button" data-sb-scope="vehicle">只拆火箭</button>
+          </div>
+          <span class="sb-scope-note" id="sbScopeNote">全部总成参与当前拆解</span>
+        </div>
+        <div class="sb-footer-actions">
+          <button type="button" class="sb-primary-btn" id="sbResetAll">全部复原</button>
+          <button type="button" id="sbResetAssembly">复原当前总成</button>
+          <button type="button" id="sbInfoBtn">资料与边界</button>
+        </div>
+      </footer>
+
+      <div class="sb-toast" id="sbToast" role="status" aria-live="polite"></div>
+
+      <div class="sb-info-modal" id="sbInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="sbInfoTitle">
+        <div class="sb-info-card">
+          <button type="button" class="sb-detail-close" id="sbInfoClose" aria-label="关闭资料说明">×</button>
+          <span class="sb-eyebrow">REFERENCE &amp; FACT BOUNDARY</span>
+          <h2 id="sbInfoTitle">资料依据与模拟边界</h2>
+          <p>
+            本页以公开资料中的 Starbase 发射塔、Starship 与 Super Heavy 构型为参考，制作了一个用于讲解空间关系的教学结构模型。
+          </p>
+          <h3>可确认为公开资料的内容</h3>
+          <ul>
+            <li>Super Heavy 是 Starship 系统的一级，设计为返回发射场并由发射塔捕获；不使用着陆腿。</li>
+            <li>Starbase 发射塔用于整合、测试、发射；塔上两根机械臂可协助堆叠 Starship，并参与捕获返回的助推器。</li>
+            <li>Starship 为不锈钢两级系统中的上级，带有襟翼与热防护系统；具体硬件随版本迭代。</li>
+          </ul>
+          <h3>教学示意 / 比例估算</h3>
+          <ul>
+            <li>塔架内部提升机构、机械臂传动、发射台夹持机构、推进剂管路与发动机内部结构。</li>
+            <li>所有精确尺寸、构件数量、开口、焊缝、管线和载荷路径。</li>
+            <li>本页使用“整箭置于发射平台”和“Super Heavy 位于捕获位”两种结构教学姿态；捕获姿态隐藏 Starship，以便观察助推器与机械臂关系。</li>
+          </ul>
+          <h3>参考版本</h3>
+          <p>2025–2026 年公开资料中的 Starship / Super Heavy 概念构型，资料整理日期：2026-10。硬件会持续迭代，请勿把任何单一版本当作永久标准。</p>
+          <div class="sb-info-links">
+            <a href="https://www.spacex.com/vehicles/starship/design" target="_blank" rel="noopener">SpaceX · Starship design ↗</a>
+            <a href="https://www.spacex.com/vehicles/starship/assets/media/Starbase%20Overview.pdf" target="_blank" rel="noopener">SpaceX · Starbase Overview PDF ↗</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lunar-panel" id="lunarPanel" hidden>
+      <div class="lunar-inner">
+        <header class="lunar-head">
+          <div>
+            <span class="eyebrow">STARSHIP HLS · ARCHITECTURE CONCEPT</span>
+            <h2>月球任务架构示意</h2>
+            <p>从地球发射到月面着陆，再到返回月球轨道的计划流程。所有步骤均标注为计划 / 概念演示。</p>
+          </div>
+          <div class="lunar-head-actions">
+            <span class="tag planned">计划 / 概念演示</span>
+            <button class="btn ghost" id="lunarClose">返回 Starship 演示</button>
+          </div>
+        </header>
+
+        <div class="lunar-layout">
+          <div class="lunar-diagram">
+            <svg viewBox="0 0 900 540" role="img" aria-label="Starship HLS 月球任务架构示意图">
+              <defs>
+                <radialGradient id="earthGrad" cx="35%" cy="35%" r="70%">
+                  <stop offset="0%" stop-color="#97e4ff" />
+                  <stop offset="45%" stop-color="#2e86b7" />
+                  <stop offset="100%" stop-color="#081c34" />
+                </radialGradient>
+                <radialGradient id="moonGrad" cx="35%" cy="35%" r="70%">
+                  <stop offset="0%" stop-color="#e6e5dd" />
+                  <stop offset="60%" stop-color="#a9a8a0" />
+                  <stop offset="100%" stop-color="#4a4b49" />
+                </radialGradient>
+                <linearGradient id="routeGrad" x1="0" x2="1">
+                  <stop offset="0%" stop-color="#67ddff" />
+                  <stop offset="55%" stop-color="#8fbaff" />
+                  <stop offset="100%" stop-color="#ffc475" />
+                </linearGradient>
+                <filter id="softGlow">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <g class="stars-mini">
+                <circle cx="120" cy="80" r="1.4" />
+                <circle cx="210" cy="45" r="1" />
+                <circle cx="340" cy="92" r="1.2" />
+                <circle cx="540" cy="60" r="1" />
+                <circle cx="680" cy="120" r="1.5" />
+                <circle cx="760" cy="70" r="1" />
+                <circle cx="470" cy="28" r="1" />
+                <circle cx="820" cy="210" r="1.2" />
+                <circle cx="90" cy="300" r="1" />
+                <circle cx="260" cy="500" r="1.2" />
+              </g>
+              <g id="earthGroup">
+                <circle cx="145" cy="390" r="82" fill="url(#earthGrad)" />
+                <circle cx="145" cy="390" r="82" fill="none" stroke="#6fe2ff" stroke-opacity="0.3" />
+                <path d="M90 345 C130 325, 165 345, 200 330" fill="none" stroke="#9ddfff" stroke-opacity="0.4" stroke-width="2" />
+                <path d="M78 400 C120 380, 155 410, 212 392" fill="none" stroke="#9ddfff" stroke-opacity="0.24" stroke-width="2" />
+                <text x="145" y="500" class="diagram-label">地球 / EARTH</text>
+                <text x="145" y="520" class="diagram-sub">Starship + Super Heavy 发射</text>
+              </g>
+              <g id="moonGroup">
+                <circle cx="760" cy="245" r="72" fill="url(#moonGrad)" />
+                <circle cx="735" cy="225" r="12" fill="#898a85" opacity="0.55" />
+                <circle cx="785" cy="270" r="18" fill="#8b8b85" opacity="0.4" />
+                <circle cx="750" cy="285" r="8" fill="#7e7f7a" opacity="0.5" />
+                <circle cx="760" cy="245" r="72" fill="none" stroke="#e6e0ca" stroke-opacity="0.25" />
+                <text x="760" y="345" class="diagram-label">月球 / MOON</text>
+              </g>
+              <path class="route route-earth" d="M220 360 C360 230, 520 145, 690 225" fill="none" stroke="url(#routeGrad)" stroke-width="2.2" stroke-dasharray="7 9" />
+              <path class="route route-orbit" d="M760 245 C830 190, 855 290, 790 320 C740 340, 710 290, 760 245" fill="none" stroke="#ffc475" stroke-width="1.4" stroke-dasharray="3 6" opacity="0.75" />
+              <path class="route route-descent" d="M812 258 C808 340, 800 400, 770 445" fill="none" stroke="#ff8b58" stroke-width="1.8" stroke-dasharray="4 5" />
+              <path class="route route-ascent" d="M724 443 C700 390, 718 325, 748 290" fill="none" stroke="#7bf3c0" stroke-width="1.6" stroke-dasharray="4 5" opacity="0.85" />
+              <g class="hls-glyph" filter="url(#softGlow)">
+                <path d="M760 430 l11 20 -11 22 -11 -22 z" fill="#d9e3e6" />
+                <rect x="755" y="468" width="10" height="12" rx="3" fill="#94a3a8" />
+                <path d="M742 480 l-16 14 M778 480 l16 14" stroke="#8ddfff" stroke-width="1.5" opacity="0.8" />
+                <circle cx="760" cy="430" r="3" fill="#8fe8ff" />
+              </g>
+              <g class="orbit-node">
+                <circle cx="700" cy="205" r="4.5" fill="#ffc475" />
+                <text x="602" y="192" class="diagram-sub warm">NRHO / 月球轨道</text>
+              </g>
+              <g class="route-labels">
+                <text x="382" y="212" class="diagram-sub">① 地球发射 · ② 轨道补给</text>
+                <text x="496" y="128" class="diagram-sub">③ 前往月球</text>
+                <text x="808" y="372" class="diagram-sub warm">④ 会合</text>
+                <text x="790" y="475" class="diagram-sub warm">⑤ 月面着陆</text>
+                <text x="650" y="455" class="diagram-sub success">⑥ 返回月球轨道</text>
+              </g>
+              <g class="callout">
+                <rect x="510" y="420" width="255" height="68" rx="8" fill="#06131a" fill-opacity="0.76" stroke="#3d7b8e" stroke-opacity="0.5" />
+                <text x="528" y="445" class="diagram-label small">HLS 是月球轨道 ↔ 月面着陆器</text>
+                <text x="528" y="466" class="diagram-sub">地球发射的 Super Heavy 不会在月面着陆。</text>
+              </g>
+            </svg>
+            <div class="lunar-disclaimer">
+              <span class="tag planned">计划</span>
+              <p>
+                NASA 将 Starship HLS 定位为月球轨道与月面之间的载人着陆器。Artemis III 的具体任务时序、补给次数与硬件细节尚未最终确定；本图仅表达架构概念。
+              </p>
+            </div>
+          </div>
+
+          <div class="lunar-steps">
+            <div class="lunar-step-list" id="lunarStepList" role="list"></div>
+            <div class="lunar-detail" id="lunarDetail"></div>
+            <div class="lunar-sources">
+              <span class="mini-label">NASA 官方来源</span>
+              <a href="https://www.nasa.gov/reference/human-landing-systems-2/" target="_blank" rel="noopener">NASA · Human Landing Systems ↗</a>
+              <a href="https://www.nasa.gov/humans-in-space/artemis-iii/" target="_blank" rel="noopener">NASA · Artemis III ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="helpModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-card">
+        <header>
+          <div>
+            <span class="eyebrow">FIELD MANUAL</span>
+            <h2 id="helpTitle">操作说明与模拟边界</h2>
+          </div>
+          <button class="panel-close" id="helpClose" aria-label="关闭说明">×</button>
+        </header>
+        <div class="help-grid">
+          <section>
+            <h3>播放与时间轴</h3>
+            <ul>
+              <li><kbd>Space</kbd> 播放 / 暂停</li>
+              <li><kbd>←</kbd> <kbd>→</kbd> 后退 / 前进 5 秒</li>
+              <li><kbd>R</kbd> 重播，<kbd>Home</kbd> 回到倒计时</li>
+              <li>拖动时间轴任意跳转；暂停状态下场景仍由统一模拟时钟重算。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>镜头与部件</h3>
+            <ul>
+              <li><kbd>1</kbd>–<kbd>7</kbd> 切换镜头；<kbd>F</kbd> 自由轨道</li>
+              <li>鼠标拖拽旋转，滚轮缩放，双击复位。</li>
+              <li>触屏单指旋转、双指缩放。</li>
+              <li>暂停后切换“整箭 / 剖面 / 爆炸拆解”；点击部件查看功能。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>事实边界</h3>
+            <p>
+              官方数据仅包括飞行器构型、部件用途与参考任务公布的事件时间。高度、速度、燃料、节流、姿态、轨迹与落点偏差均为简化模拟，不来自 SpaceX 内部遥测。
+            </p>
+            <p>
+              Crew-12 为陆地回收并包含返航点火；Starlink 10-38 官方时间线未列返航点火，因此海上模式中没有该事件。
+            </p>
+          </section>
+          <section>
+            <h3>Starship 与 HLS</h3>
+            <p>
+              Starship 模式是独立的 Super Heavy / Starship 概念演示，使用发射塔机械臂捕获，不使用 Falcon 9 的着陆腿。HLS 月球架构为计划 / 概念示意，不是已完成的飞行。
+            </p>
+          </section>
+        </div>
+        <footer class="help-footer">
+          <span>Three.js — MIT License · 所有模型、纹理与粒子均由程序生成</span>
+          <button class="btn ghost" id="helpDone">知道了</button>
+        </footer>
+      </div>
+    </div>
+
+    <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
